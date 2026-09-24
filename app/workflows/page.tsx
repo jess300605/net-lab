@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { Check, Copy, GitBranch, Play, Shield, Calculator, Wrench, Network, Server, LockKeyhole } from 'lucide-react'
 import NetworkShell from '@/components/network-shell'
 
-type Lab = 'vlan' | 'acl' | 'subnet' | 'firewall' | 'vpn' | 'nat' | 'dhcp' | 'troubleshoot'
+type Lab = 'vlan' | 'acl' | 'subnet' | 'firewall' | 'vpn' | 'nat' | 'dhcp' | 'ipv6' | 'hsrp' | 'portsecurity' | 'troubleshoot'
 
 type LabInfo = { id: Lab; title: string; detail: string; icon: typeof GitBranch }
 const labs: LabInfo[] = [
@@ -15,6 +15,9 @@ const labs: LabInfo[] = [
   { id: 'vpn', title: 'VPN site-to-site', detail: 'IPsec entre sedes', icon: Network },
   { id: 'nat', title: 'NAT / PAT', detail: 'Publica y traduce redes', icon: Server },
   { id: 'dhcp', title: 'DHCP relay', detail: 'Entrega IP entre VLANs', icon: Network },
+  { id: 'ipv6', title: 'IPv6 básico', detail: 'Direcciones y routing IPv6', icon: Network },
+  { id: 'hsrp', title: 'Gateway redundante', detail: 'HSRP para alta disponibilidad', icon: Shield },
+  { id: 'portsecurity', title: 'Seguridad de puertos', detail: 'Limita MAC y acceso físico', icon: LockKeyhole },
   { id: 'troubleshoot', title: 'Troubleshooting', detail: 'Diagnostica por capas', icon: Wrench },
 ]
 
@@ -41,7 +44,10 @@ export default function Workflows() {
     if (active === 'firewall') return `${header}enable\n! Firewall ZBF: las zonas aíslan interfaces y la policy-map inspecciona sesiones\n! Orden recomendado: zonas -> ACL de clasificación -> class-map -> policy-map -> zone-pair\nconfigure terminal\nzone security INSIDE\nzone security OUTSIDE\ninterface ${zoneInside}\n zone-member security INSIDE\nexit\ninterface ${zoneOutside}\n zone-member security OUTSIDE\nexit\nip access-list extended OUTSIDE_TO_WEB\n permit tcp any any eq 443\n permit udp any any eq 53\n deny ip any any log\nexit\nclass-map type inspect match-any ALLOWED-TRAFFIC\n match access-group name OUTSIDE_TO_WEB\nexit\npolicy-map type inspect INSIDE_TO_OUTSIDE\n class type inspect ALLOWED-TRAFFIC\n  inspect\n class class-default\n  drop log\nexit\nzone-pair security INSIDE-OUTSIDE source INSIDE destination OUTSIDE\n service-policy type inspect INSIDE_TO_OUTSIDE\nend\nshow policy-map type inspect zone-pair sessions\nshow policy-map type inspect zone-pair statistics\n! Verifica primero en laboratorio; una zone-pair sin policy puede bloquear tráfico\ncopy running-config startup-config`
     if (active === 'vpn') return `${header}enable\nconfigure terminal\ncrypto isakmp policy 10\n encr aes 256\n hash sha256\n authentication pre-share\n group 14\nexit\ncrypto isakmp key <CLAVE_COMPARTIDA> address ${peer}\nip access-list extended VPN-TRAFFIC\n permit ip ${localNet} 0.0.0.255 ${remoteNet} 0.0.0.255\nexit\ncrypto ipsec transform-set VPN-SET esp-aes 256 esp-sha256-hmac\n mode tunnel\nexit\ncrypto map VPN-MAP 10 ipsec-isakmp\n set peer ${peer}\n set transform-set VPN-SET\n match address VPN-TRAFFIC\nexit\ninterface ${zoneOutside}\n crypto map VPN-MAP\nend\nshow crypto isakmp sa\nshow crypto ipsec sa\ncopy running-config startup-config`
     if (active === 'nat') return `${header}enable\nconfigure terminal\nip access-list standard NAT_INSIDE\n permit ${insideNet.replace('/24', ' 0.0.0.255')}\nexit\nip nat inside source list NAT_INSIDE interface ${zoneOutside} overload\ninterface ${zoneInside}\n ip nat inside\nexit\ninterface ${zoneOutside}\n ip nat outside\nexit\n! Publicación opcional de servidor\nip nat inside source static tcp ${insideNet.split('/')[0]} ${servicePort} ${publicIp} ${servicePort}\nend\nshow ip nat translations\nshow ip nat statistics\ncopy running-config startup-config`
-    if (active === 'dhcp') return `enable\nconfigure terminal\nip dhcp relay information trusted\ninterface ${zoneInside}\n ip helper-address ${dhcpServer}\n no shutdown\nexit\nend\nshow ip interface ${zoneInside}\nshow ip dhcp binding\ndebug ip dhcp server events\nundebug all\ncopy running-config startup-config`
+    if (active === 'dhcp') return `${header}enable\nconfigure terminal\nip dhcp relay information trusted\ninterface ${zoneInside}\n ip helper-address ${dhcpServer}\n no shutdown\nexit\nend\nshow ip interface ${zoneInside}\nshow ip dhcp binding\ndebug ip dhcp server events\nundebug all\ncopy running-config startup-config`
+    if (active === 'ipv6') return `${header}enable\nconfigure terminal\nipv6 unicast-routing\ninterface ${zoneInside}\n ipv6 address 2001:db8:10::1/64\n ipv6 enable\n no shutdown\nexit\nipv6 route ::/0 ${peer}\nend\nshow ipv6 interface brief\nshow ipv6 route\nping ipv6 2001:db8:10::10\ncopy running-config startup-config`
+    if (active === 'hsrp') return `${header}enable\nconfigure terminal\ninterface ${zoneInside}\n standby 10 ip ${ip}\n standby 10 priority 110\n standby 10 preempt\n standby 10 track ${zoneOutside} 20\n no shutdown\nend\nshow standby brief\nshow ip interface brief\ncopy running-config startup-config`
+    if (active === 'portsecurity') return `${header}enable\nconfigure terminal\ninterface ${port}\n switchport mode access\n switchport access vlan ${vlan}\n switchport port-security\n switchport port-security maximum 2\n switchport port-security mac-address sticky\n switchport port-security violation restrict\n spanning-tree portfast\n spanning-tree bpduguard enable\nend\nshow port-security interface ${port}\nshow port-security address\ncopy running-config startup-config`
     return `${header}enable\nterminal length 0\nshow ip interface brief\nshow interfaces ${zoneInside} counters errors\nshow interfaces ${zoneInside} status\nshow vlan brief\nshow interfaces trunk\nshow ip route\nshow arp\nping ${network}\ntraceroute ${network}\nshow logging | include ERROR|DOWN|UP\nshow cdp neighbors detail\nshow spanning-tree inconsistentports\nshow access-lists\nshow ip nat translations\nshow crypto isakmp sa`
   }, [active, device, cliMode, vlan, name, ip, mask, port, trunk, aclName, source, sourceWildcard, destination, protocol, servicePort, aclAction, aclInterface, network, prefix, zoneInside, zoneOutside, peer, localNet, remoteNet, dhcpServer, insideNet, publicIp])
 

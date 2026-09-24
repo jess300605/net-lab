@@ -99,6 +99,19 @@ function describeCommand(command: string) {
   if (command.startsWith('switchport ')) return 'Configura el modo, VLAN o parámetros de conmutación del puerto.'
   if (command.startsWith('ip nat ')) return 'Define una regla de traducción o publicación mediante NAT.'
   if (command.startsWith('logging ')) return 'Configura el envío o nivel de los registros del dispositivo.'
+  if (command.startsWith('zone ')) return 'Crea una zona de seguridad para agrupar interfaces con el mismo nivel de confianza.'
+  if (command.startsWith('permit ') || command.startsWith('deny ')) return 'Define una regla ACL que permite o bloquea tráfico por protocolo, origen, destino o puerto.'
+  if (command.startsWith('class-map')) return 'Clasifica el tráfico que será inspeccionado por la política del firewall.'
+  if (command.startsWith('policy-map')) return 'Crea una política que inspecciona, permite o descarta clases de tráfico.'
+  if (command === 'inspect') return 'Inspecciona sesiones y permite el tráfico de retorno de forma stateful.'
+  if (command.startsWith('drop ')) return 'Descarta tráfico que no coincide con una regla permitida y registra el evento.'
+  if (command.startsWith('zone-pair')) return 'Define la dirección del tráfico entre dos zonas de seguridad.'
+  if (command.startsWith('service-policy')) return 'Aplica la política de inspección al tráfico entre las zonas.'
+  if (command.startsWith('ipv6 ')) return 'Configura o consulta direccionamiento y routing IPv6.'
+  if (command.startsWith('standby ')) return 'Configura parámetros HSRP para ofrecer un gateway virtual redundante.'
+  if (command.startsWith('switchport port-security')) return 'Limita y controla las direcciones MAC permitidas en el puerto.'
+  if (command.startsWith('ip dhcp snooping')) return 'Activa protección contra servidores DHCP no autorizados.'
+  if (command.startsWith('ip arp inspection')) return 'Valida respuestas ARP para reducir ataques de suplantación.'
   if (command.startsWith('no ')) return 'Desactiva o elimina la configuración indicada.'
   return 'Ejecuta este comando en el contexto indicado para aplicar el cambio de configuración.'
 }
@@ -111,6 +124,9 @@ const groups: CommandGroup[] = [
   { title: 'DHCP y relay', description: 'Entrega direcciones automáticamente o reenvía solicitudes.', commands: ['ip dhcp excluded-address 192.168.10.1 192.168.10.20', 'ip dhcp pool LAN-USUARIOS', 'network 192.168.10.0 255.255.255.0', 'default-router 192.168.10.1', 'dns-server 1.1.1.1 8.8.8.8', 'domain-name campus.local', 'lease 7', 'interface Vlan10', 'ip helper-address 192.168.50.10', 'show ip dhcp binding', 'show ip dhcp pool'] },
   { title: 'Servicios en router', description: 'Configura DNS, NTP, Syslog, banner y acceso de administración.', commands: ['ip domain name campus.local', 'ip name-server 1.1.1.1 8.8.8.8', 'ntp server 192.168.50.20', 'clock timezone UTC 0 0', 'service timestamps log datetime msec', 'logging host 192.168.50.30', 'logging trap warnings', 'ip http secure-server', 'banner motd ^CAcceso autorizado solamente^C', 'show clock', 'show logging', 'show ntp associations'] },
   { title: 'NAT, PAT y publicación', description: 'Traduce direcciones privadas y publica un servicio interno.', commands: ['interface GigabitEthernet0/0', 'ip nat inside', 'interface GigabitEthernet0/1', 'ip nat outside', 'access-list 10 permit 192.168.10.0 0.0.0.255', 'ip nat inside source list 10 interface GigabitEthernet0/1 overload', 'ip nat inside source static tcp 192.168.10.50 443 interface GigabitEthernet0/1 443', 'show ip nat translations', 'show ip nat statistics', 'clear ip nat translation *'] },
+  { title: 'Firewall ZBF y reglas de inspección', description: 'Construye zonas, clasificación, políticas stateful y reglas de control.', commands: ['zone security INSIDE', 'zone security OUTSIDE', 'ip access-list extended OUTSIDE-WEB', 'permit tcp any any eq 443', 'permit udp any any eq 53', 'class-map type inspect match-any WEB-DNS', 'match access-group name OUTSIDE-WEB', 'policy-map type inspect INSIDE-OUTSIDE', 'class type inspect WEB-DNS', 'inspect', 'class class-default', 'drop log', 'zone-pair security IN-OUT source INSIDE destination OUTSIDE', 'service-policy type inspect INSIDE-OUTSIDE', 'show policy-map type inspect zone-pair sessions', 'show policy-map type inspect zone-pair statistics', 'show zone-pair security', 'clear zone-pair counters'] },
+  { title: 'IPv6 y gateway redundante', description: 'Configura direccionamiento IPv6, rutas y HSRP para continuidad.', commands: ['ipv6 unicast-routing', 'ipv6 address 2001:db8:10::1/64', 'ipv6 enable', 'ipv6 route ::/0 2001:db8:ff::1', 'show ipv6 interface brief', 'show ipv6 route', 'standby 10 ip 192.168.10.254', 'standby 10 priority 110', 'standby 10 preempt', 'show standby brief'] },
+  { title: 'Seguridad de Capa 2', description: 'Protege puertos, STP y asignaciones contra equipos no autorizados.', commands: ['switchport port-security', 'switchport port-security maximum 2', 'switchport port-security mac-address sticky', 'switchport port-security violation restrict', 'spanning-tree portfast', 'spanning-tree bpduguard enable', 'ip dhcp snooping', 'ip dhcp snooping vlan 10,20,30', 'ip arp inspection vlan 10,20,30', 'show port-security interface GigabitEthernet0/1', 'show spanning-tree inconsistentports'] },
   { title: 'Guardado y diagnóstico', description: 'Verifica el estado antes de guardar cambios.', commands: ['show running-config', 'show startup-config', 'show version', 'show inventory', 'show interfaces counters errors', 'show processes cpu sorted', 'show memory statistics', 'ping 192.168.10.1 source 192.168.10.254', 'traceroute 8.8.8.8', 'copy running-config startup-config', 'reload'] },
 ]
 

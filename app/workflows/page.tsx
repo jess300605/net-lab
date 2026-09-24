@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { Check, Copy, GitBranch, Play, Shield, Calculator, Wrench, Network, Server, LockKeyhole } from 'lucide-react'
 import NetworkShell from '@/components/network-shell'
 
-type Lab = 'vlan' | 'acl' | 'subnet' | 'firewall' | 'vpn' | 'nat' | 'dhcp' | 'ipv6' | 'hsrp' | 'portsecurity' | 'troubleshoot'
+type Lab = 'vlan' | 'acl' | 'subnet' | 'firewall' | 'vpn' | 'nat' | 'dhcp' | 'ipv6' | 'hsrp' | 'portsecurity' | 'etherchannel' | 'ospf' | 'vrf' | 'qos' | 'troubleshoot'
 
 type LabInfo = { id: Lab; title: string; detail: string; icon: typeof GitBranch }
 const labs: LabInfo[] = [
@@ -18,6 +18,10 @@ const labs: LabInfo[] = [
   { id: 'ipv6', title: 'IPv6 básico', detail: 'Direcciones y routing IPv6', icon: Network },
   { id: 'hsrp', title: 'Gateway redundante', detail: 'HSRP para alta disponibilidad', icon: Shield },
   { id: 'portsecurity', title: 'Seguridad de puertos', detail: 'Limita MAC y acceso físico', icon: LockKeyhole },
+  { id: 'etherchannel', title: 'EtherChannel', detail: 'Agrega enlaces con LACP', icon: Network },
+  { id: 'ospf', title: 'OSPF multiárea', detail: 'Diseña áreas y vecinos', icon: GitBranch },
+  { id: 'vrf', title: 'VRF-Lite', detail: 'Aísla tablas de routing', icon: Shield },
+  { id: 'qos', title: 'QoS básico', detail: 'Prioriza voz y datos', icon: Play },
   { id: 'troubleshoot', title: 'Troubleshooting', detail: 'Diagnostica por capas', icon: Wrench },
 ]
 
@@ -47,6 +51,10 @@ export default function Workflows() {
     if (active === 'dhcp') return `${header}enable\nconfigure terminal\nip dhcp relay information trusted\ninterface ${zoneInside}\n ip helper-address ${dhcpServer}\n no shutdown\nexit\nend\nshow ip interface ${zoneInside}\nshow ip dhcp binding\ndebug ip dhcp server events\nundebug all\ncopy running-config startup-config`
     if (active === 'ipv6') return `${header}enable\nconfigure terminal\nipv6 unicast-routing\ninterface ${zoneInside}\n ipv6 address 2001:db8:10::1/64\n ipv6 enable\n no shutdown\nexit\nipv6 route ::/0 ${peer}\nend\nshow ipv6 interface brief\nshow ipv6 route\nping ipv6 2001:db8:10::10\ncopy running-config startup-config`
     if (active === 'hsrp') return `${header}enable\nconfigure terminal\ninterface ${zoneInside}\n standby 10 ip ${ip}\n standby 10 priority 110\n standby 10 preempt\n standby 10 track ${zoneOutside} 20\n no shutdown\nend\nshow standby brief\nshow ip interface brief\ncopy running-config startup-config`
+    if (active === 'etherchannel') return `${header}enable\nconfigure terminal\ninterface range ${port}, ${trunk}\n channel-group 1 mode active\nexit\ninterface Port-channel1\n switchport mode trunk\n switchport trunk allowed vlan ${vlan},20,99\n spanning-tree portfast trunk\nend\nshow etherchannel summary\nshow interfaces port-channel 1\ncopy running-config startup-config`
+    if (active === 'ospf') return `${header}enable\nconfigure terminal\nrouter ospf 10\n router-id 1.1.1.1\n passive-interface default\n no passive-interface ${zoneInside}\n network ${localNet} 0.0.0.255 area 10\n network 10.0.0.0 0.0.0.3 area 0\n area 10 range ${localNet} 255.255.255.0\nend\nshow ip ospf neighbor\nshow ip ospf interface brief\nshow ip route ospf\ncopy running-config startup-config`
+    if (active === 'vrf') return `${header}enable\nconfigure terminal\nip vrf ${name.toUpperCase()}\n rd 65000:${vlan}\n route-target export 65000:${vlan}\n route-target import 65000:${vlan}\ninterface ${zoneInside}\n ip vrf forwarding ${name.toUpperCase()}\n ip address ${ip} ${mask}\n no shutdown\nend\nshow ip vrf\nshow ip route vrf ${name.toUpperCase()}\ncopy running-config startup-config`
+    if (active === 'qos') return `${header}enable\nconfigure terminal\nclass-map match-any VOICE\n match dscp ef\nexit\npolicy-map WAN-QOS\n class VOICE\n  priority percent 20\n class class-default\n  fair-queue\ninterface ${zoneOutside}\n service-policy output WAN-QOS\nend\nshow policy-map interface ${zoneOutside}\ncopy running-config startup-config`
     if (active === 'portsecurity') return `${header}enable\nconfigure terminal\ninterface ${port}\n switchport mode access\n switchport access vlan ${vlan}\n switchport port-security\n switchport port-security maximum 2\n switchport port-security mac-address sticky\n switchport port-security violation restrict\n spanning-tree portfast\n spanning-tree bpduguard enable\nend\nshow port-security interface ${port}\nshow port-security address\ncopy running-config startup-config`
     return `${header}enable\nterminal length 0\nshow ip interface brief\nshow interfaces ${zoneInside} counters errors\nshow interfaces ${zoneInside} status\nshow vlan brief\nshow interfaces trunk\nshow ip route\nshow arp\nping ${network}\ntraceroute ${network}\nshow logging | include ERROR|DOWN|UP\nshow cdp neighbors detail\nshow spanning-tree inconsistentports\nshow access-lists\nshow ip nat translations\nshow crypto isakmp sa`
   }, [active, device, cliMode, vlan, name, ip, mask, port, trunk, aclName, source, sourceWildcard, destination, protocol, servicePort, aclAction, aclInterface, network, prefix, zoneInside, zoneOutside, peer, localNet, remoteNet, dhcpServer, insideNet, publicIp])
